@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+
+<html lang="ar" dir="rtl">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>عرض المقال</title>
+
+    
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" integrity="sha512-GsLlZN/3F2ErC5ifS5QtgpiJtWd43JWSuIghmbzZstdNfxrJxwNSKCFMtgPkwhpjPoztLshyMgxaOBshxiHPYg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+    <style>
+
+        body {
+
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+
+            background-color: #f4f4f4;
+
+            margin: 0;
+
+            padding: 20px;
+
+            color: #333;
+
+        }
+
+        #articleWrapper {
+
+            max-width: 800px;
+
+            margin: 0 auto;
+
+            background-color: #fff;
+
+            border: 1px solid #ddd;
+
+            border-radius: 8px;
+
+            padding: 25px 30px;
+
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+
+        }
+
+        #articleTitle {
+
+            font-size: 2.2rem;
+
+            font-weight: bold;
+
+            margin-bottom: 20px;
+
+            border-bottom: 2px solid #eee;
+
+            padding-bottom: 15px;
+
+        }
+
+        #articleContent {
+
+            line-height: 1.7;
+
+            font-size: 1.1rem;
+
+        }
+
+        /* لضمان ظهور الصور والوسائط بشكل جيد */
+
+        #articleContent img {
+
+            max-width: 100%;
+
+            height: auto;
+
+            border-radius: 5px;
+
+        }
+
+        #articleContent blockquote {
+
+            border-right: 4px solid #ccc;
+
+            padding-right: 15px;
+
+            margin-right: 0;
+
+            font-style: italic;
+
+            color: #555;
+
+        }
+
+        
+
+        #downloadPdfButton {
+
+            display: block;
+
+            width: 100%;
+
+            max-width: 800px;
+
+            margin: 30px auto;
+
+            padding: 15px;
+
+            font-size: 1.2rem;
+
+            font-weight: bold;
+
+            background-color: #007bff;
+
+            color: white;
+
+            border: none;
+
+            border-radius: 8px;
+
+            cursor: pointer;
+
+            text-align: center;
+
+        }
+
+        #downloadPdfButton:hover {
+
+            background-color: #0056b3;
+
+        }
+
+        #errorMessage {
+
+            text-align: center;
+
+            font-size: 1.2rem;
+
+            color: #dc3545;
+
+            padding: 40px;
+
+        }
+
+    </style>
+
+</head>
+
+<body>
+
+    <div id="articleWrapper">
+
+        <h1 id="articleTitle">جاري تحميل العنوان...</h1>
+
+        <div id="articleContent">
+
+            <p>جاري تحميل المحتوى...</p>
+
+        </div>
+
+    </div>
+
+    <button id="downloadPdfButton">تحميل PDF</button>
+
+    <div id="errorMessage" style="display: none;"></div>
+
+    <script>
+
+        document.addEventListener('DOMContentLoaded', () => {
+
+            const titleEl = document.getElementById('articleTitle');
+
+            const contentEl = document.getElementById('articleContent');
+
+            const downloadBtn = document.getElementById('downloadPdfButton');
+
+            const errorEl = document.getElementById('errorMessage');
+
+            const articleWrapper = document.getElementById('articleWrapper');
+
+            
+
+            let articleTitleForPdf = "article";
+
+            /** 1. جلب ID المقال من الرابط */
+
+            const urlParams = new URLSearchParams(window.location.search);
+
+            const articleId = urlParams.get('id');
+
+            if (!articleId) {
+
+                showError("خطأ: لم يتم تحديد مقال.");
+
+                return;
+
+            }
+
+            /** 2. محاولة قراءة المقال من localStorage */
+
+            try {
+
+                // ملاحظة: هذا سيعمل فقط إذا تم فتح الملف من نفس النطاق (Domain) الذي تم منه حفظ المقال
+
+                const articles = JSON.parse(localStorage.getItem('articles')) || [];
+
+                const article = articles.find(a => a.id == articleId);
+
+                if (!article) {
+
+                    showError("خطأ: المقال غير موجود. (قد تكون المشكلة في عدم مشاركة localStorage بين التطبيق والمتصفح الخارجي).");
+
+                    return;
+
+                }
+
+                /** 3. عرض المقال */
+
+                const doc = new DOMParser().parseFromString(article.content, 'text/html');
+
+                const h1 = doc.querySelector('h1');
+
+                
+
+                if (h1) {
+
+                    titleEl.innerHTML = h1.innerHTML;
+
+                    articleTitleForPdf = h1.textContent.trim();
+
+                    h1.remove(); 
+
+                } else {
+
+                    titleEl.textContent = article.title || "مقالة";
+
+                    articleTitleForPdf = article.title || "article";
+
+                }
+
+                
+
+                contentEl.innerHTML = doc.body.innerHTML; 
+
+            } catch (e) {
+
+                console.error(e);
+
+                showError("حدث خطأ أثناء تحميل المقال. تأكد أن الملفات على استضافة عامة.");
+
+            }
+
+            /** 4. إعداد زر تحميل PDF */
+
+            downloadBtn.addEventListener('click', () => {
+
+                const element = document.getElementById('articleWrapper');
+
+                
+
+                // إخفاء زر التحميل مؤقتاً لتجنب ظهوره في PDF
+
+                downloadBtn.style.display = 'none';
+
+                const opt = {
+
+                    margin:       0.5,
+
+                    filename:     `${articleTitleForPdf}.pdf`,
+
+                    image:        { type: 'jpeg', quality: 0.98 },
+
+                    html2canvas:  { scale: 2, useCORS: true },
+
+                    jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' },
+
+                    pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] }
+
+                };
+
+                // تشغيل التحويل ثم إعادة إظهار الزر
+
+                html2pdf().set(opt).from(element).save().then(() => {
+
+                    downloadBtn.style.display = 'block';
+
+                });
+
+            });
+
+            function showError(message) {
+
+                articleWrapper.style.display = 'none';
+
+                downloadBtn.style.display = 'none';
+
+                errorEl.textContent = message;
+
+                errorEl.style.display = 'block';
+
+            }
+
+        });
+
+    </script>
+
+</body>
+
+</html>
